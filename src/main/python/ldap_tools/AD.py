@@ -1,15 +1,19 @@
 import ldap3
 import json
 import logging
-
+import os
+from dotenv import load_dotenv
 from ldap3 import ALL_ATTRIBUTES, Connection, NTLM, Server, MODIFY_REPLACE
 
-LDAP_HOST = "tpedc03.wanhai.com"
+
+load_dotenv()
+LDAP_HOST = os.getenv('LDAP_HOST_ADDR')
+LDAP_PORT =int(os.getenv('LDAP_HOST_PORT'))
 DOMAIN = 'wanhai.com'
-ad_server = Server(LDAP_HOST, port=3268, get_info=ldap3.ALL, connect_timeout=5)
+ad_server = Server(LDAP_HOST, port=LDAP_PORT, get_info=ldap3.ALL, connect_timeout=5)
 LDAP_SERVER_POOL = [ad_server]
-SERVER_USER = 'wanhai\op manager'
-SERVER_PASSWORD = ""
+LDAP_SERVER_USER = os.getenv('LDAP_SERVER_USER')
+LDAP_SERVER_PASSWORD = os.getenv('LDAP_SERVER_PASSWORD')
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('Main Logger')
@@ -21,13 +25,15 @@ class ActiveDirectory(object):
         """
         initialize
         """
+
+
         self.conn = Connection(  # 配置服务器连接参数
             server=LDAP_SERVER_POOL,
             auto_bind=True,
             authentication=NTLM,  # it's require to connect Windows AD
             read_only=True,  # Not allow to modify：True
-            user=SERVER_USER,  # Administrator account
-            password=SERVER_PASSWORD, # Administrator password
+            user=LDAP_SERVER_USER,  # Administrator account
+            password=LDAP_SERVER_PASSWORD, # Administrator password
         )
 
         self.active_base_dn = 'OU=it,OU=tpe,OU=tw,OU=MailAccount,DC=wanhai,DC=com'  #base dn
@@ -157,7 +163,12 @@ class ActiveDirectory(object):
         res = self.conn.modify_dn(dn=dn, relative_dn=relative_dn, new_superior=superou)
         return res
 
-    def check_credentials(self, username, password):
+    def __convert_user_name(self, username):
+
+        return username
+
+    @staticmethod
+    def check_credentials(username, password):
         """
         驗證user帳密
         """
@@ -166,8 +177,9 @@ class ActiveDirectory(object):
 
         connection = Connection(server, user=ldap_user, password=password, authentication=NTLM)
         try:
-            logger.info("username:%s ;res: %s" % (username, connection.bind()))
-            return connection.bind()
+            result = connection.bind()
+            logger.info("username:%s ;res: %s" % (username, result))
+            return result
         except:
             logger.warning("username:%s ;res: %s" % (username, connection.bind()))
             return False
